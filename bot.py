@@ -4,7 +4,7 @@ import logging
 import html
 
 # --- НАСТРОЙКИ ---
-BOT_TOKEN = "СЮДА_ВСТАВЬ_НОВЫЙ_ТОКЕН_БРАТА"  # Токен нового бота от BotFather
+BOT_TOKEN = "8799157488:AAGyd29t4Ip3dK5AnY2O5gJWCPXMKkgaAwg"
 ADMIN_CHAT_ID = -1003897470783  # ID нового канала брата
 # ------------------
 
