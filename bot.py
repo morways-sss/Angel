@@ -23,6 +23,12 @@ def get_main_keyboard():
     markup.add(btn_profile, btn_support)
     return markup
 
+def get_cancel_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    btn_cancel = types.KeyboardButton("🔙 Вернуться в меню")
+    markup.add(btn_cancel)
+    return markup
+
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     if message.chat.id in user_requests:
@@ -66,6 +72,12 @@ def handle_admin_reply(message):
 # --- ГЛАВНОЕ МЕНЮ ---
 @bot.message_handler(func=lambda message: True)
 def handle_menu(message):
+    if message.text == "🔙 Вернуться в меню":
+        if message.chat.id in user_requests:
+            del user_requests[message.chat.id]
+        bot.send_message(message.chat.id, "Вы вернулись в главное меню. Выберите нужный пункт:", reply_markup=get_main_keyboard())
+        return
+
     if message.text == "💰 Получить выплату за промокод":
         user_requests[message.chat.id] = {'photo_id': None, 'bank': None, 'server': None, 'ingame_name': None}
         
@@ -79,7 +91,7 @@ def handle_menu(message):
             message.chat.id, 
             step_1_text, 
             parse_mode="HTML",
-            reply_markup=types.ReplyKeyboardRemove()
+            reply_markup=get_cancel_keyboard()
         )
         bot.register_next_step_handler(msg, process_step_screenshot)
 
@@ -98,18 +110,18 @@ def handle_menu(message):
         msg = bot.send_message(
             message.chat.id, 
             "Напишите ниже свой вопрос или опишите проблему. Администрация рассмотрит обращение в ближайшее время:",
-            reply_markup=types.ReplyKeyboardRemove()
+            reply_markup=get_cancel_keyboard()
         )
         bot.register_next_step_handler(msg, process_support_question)
 
 # --- ШАГИ ОФОРМЛЕНИЯ ЗАЯВКИ НА ВЫПЛАТУ ---
 def process_step_screenshot(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Вернуться в меню" or message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
         handle_menu(message)
         return
 
     if not message.photo:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, отправьте именно скриншот (картинку):")
+        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, отправьте именно скриншот (картинку):", reply_markup=get_cancel_keyboard())
         bot.register_next_step_handler(msg, process_step_screenshot)
         return
 
@@ -126,17 +138,18 @@ def process_step_screenshot(message):
     msg = bot.send_message(
         message.chat.id, 
         step_2_text, 
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=get_cancel_keyboard()
     )
     bot.register_next_step_handler(msg, process_step_bank)
 
 def process_step_bank(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Вернуться в меню" or message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
         handle_menu(message)
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, введите номер банковского счёта или Статик текстом:")
+        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, введите номер банковского счёта или Статик текстом:", reply_markup=get_cancel_keyboard())
         bot.register_next_step_handler(msg, process_step_bank)
         return
 
@@ -153,17 +166,18 @@ def process_step_bank(message):
     msg = bot.send_message(
         message.chat.id, 
         step_3_text, 
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=get_cancel_keyboard()
     )
     bot.register_next_step_handler(msg, process_step_server)
 
 def process_step_server(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Вернуться в меню" or message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
         handle_menu(message)
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, укажите ваш сервер текстом:")
+        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, укажите ваш server текстом:", reply_markup=get_cancel_keyboard())
         bot.register_next_step_handler(msg, process_step_server)
         return
 
@@ -180,17 +194,18 @@ def process_step_server(message):
     msg = bot.send_message(
         message.chat.id, 
         step_4_text, 
-        parse_mode="HTML"
+        parse_mode="HTML",
+        reply_markup=get_cancel_keyboard()
     )
     bot.register_next_step_handler(msg, process_step_name)
 
 def process_step_name(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Вернуться в меню" or message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
         handle_menu(message)
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, укажите ваше игровое имя текстом:")
+        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, укажите ваше игровое имя текстом:", reply_markup=get_cancel_keyboard())
         bot.register_next_step_handler(msg, process_step_name)
         return
 
@@ -236,12 +251,12 @@ def process_step_name(message):
 
 # --- ПОДДЕРЖКА ---
 def process_support_question(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Вернуться в меню" or message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
         handle_menu(message)
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "Пожалуйста, отправьте текстовое сообщение с вашим вопросом:")
+        msg = bot.send_message(message.chat.id, "Пожалуйста, отправьте текстовое сообщение с вашим вопросом:", reply_markup=get_cancel_keyboard())
         bot.register_next_step_handler(msg, process_support_question)
         return
 
