@@ -11,25 +11,33 @@ ADMIN_CHAT_ID = -1003897470783  # ID канала брата
 bot = telebot.TeleBot(BOT_TOKEN)
 logging.basicConfig(level=logging.INFO)
 
-# Временное хранилище для активных заявок
+# Временное хранилище данных
 user_requests = {}
 
+# --- КЛАВИАТУРЫ ---
 def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn_payout = types.KeyboardButton("💰 Получить выплату за промокод")
-    btn_profile = types.KeyboardButton("👤 Личный кабинет")
-    btn_support = types.KeyboardButton("🆘 Поддержка")
+    btn_payout = types.KeyboardButton("💰 Оформить выплату")
+    btn_profile = types.KeyboardButton("👤 Мой профиль")
+    btn_support = types.KeyboardButton("🆘 Связь с админом")
     markup.add(btn_payout)
     markup.add(btn_profile, btn_support)
     return markup
 
+def get_cancel_keyboard():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=1)
+    btn_cancel = types.KeyboardButton("🔙 Назад в меню")
+    markup.add(btn_cancel)
+    return markup
+
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
-    bot.send_message(
-        message.chat.id, 
-        f"Привет, {message.from_user.first_name}! Добро пожаловать в бот выплат. Воспользуйся меню ниже:",
-        reply_markup=get_main_keyboard()
+    welcome_text = (
+        f"Приветствуем, {message.from_user.first_name}!\n\n"
+        f"Это официальный автоматизированный сервис по обработке промокодов и выдаче вознаграждений. "
+        f"Используйте интерактивное меню ниже для навигации:"
     )
+    bot.send_message(message.chat.id, welcome_text, reply_markup=get_main_keyboard())
 
 # --- ОБРАБОТКА ОТВЕТОВ ИЗ КАНАЛА ---
 @bot.channel_post_handler(func=lambda message: message.reply_to_message is not None)
@@ -42,62 +50,70 @@ def handle_admin_reply(message):
         return
 
     try:
-        # Умный поиск ID (извлекает только цифры после двоеточия)
         raw_part = original_text.split("User_ID:")[1]
         clean_id = "".join(c for c in raw_part if c.isdigit())
-        
         user_id = int(clean_id)
         
-        if "Новый вопрос в поддержку!" in original_text:
-            response_text = f"📢 <b>Ответ от поддержки:</b>\n\n{html.escape(message.text)}"
+        if "Поступило новое обращение!" in original_text:
+            response_text = f"✉️ <b>Официальный ответ администрации:</b>\n\n{html.escape(message.text)}"
         else:
-            response_text = f"📢 <b>Ответ по вашей заявке:</b>\n\n{html.escape(message.text)}"
+            response_text = f"💵 <b>Статус вашей заявки изменен:</b>\n\n{html.escape(message.text)}"
 
         bot.send_message(chat_id=user_id, text=response_text, parse_mode="HTML")
-        bot.send_message(ADMIN_CHAT_ID, f"✅ Ответ успешно отправлен игроку (ID: {user_id})", reply_markup=None)
+        bot.send_message(ADMIN_CHAT_ID, f"✅ Уведомление отправлено пользователю (ID: {user_id})", reply_markup=None)
     except Exception as e:
-        bot.send_message(ADMIN_CHAT_ID, f"❌ Не удалось отправить ответ: {e}")
+        bot.send_message(ADMIN_CHAT_ID, f"❌ Ошибка отправки: {e}")
 
 # --- ГЛАВНОЕ МЕНЮ ---
 @bot.message_handler(func=lambda message: True)
 def handle_menu(message):
-    if message.text == "💰 Получить выплату за промокод":
+    if message.text == "🔙 Назад в меню":
+        if message.chat.id in user_requests:
+            del user_requests[message.chat.id]
+        bot.send_message(message.chat.id, "Вы вернулись в главное меню.", reply_markup=get_main_keyboard())
+        return
+
+    if message.text == "💰 Оформить выплату":
         user_requests[message.chat.id] = {}
         msg = bot.send_message(
             message.chat.id, 
-            "<b>Шаг 1 из 3</b>\n\nОтправьте скриншот момента, как вы ввели промокод (из окна F2, где чётко видно, какой промокод был введён).\n\nПожалуйста, отправьте как изображение, а не файлом:", 
+            "<b>Этап 1 из 3: Верификация промокода</b>\n\n"
+            "Пожалуйста, отправьте скриншот из игры (меню F2), подтверждающий успешную активацию промокода.\n\n"
+            "<i>Важно: отправляйте файл как обычное изображение (сжатое), а не документом.</i>", 
             parse_mode="HTML",
-            reply_markup=types.ReplyKeyboardRemove()
+            reply_markup=get_cancel_keyboard()
         )
         bot.register_next_step_handler(msg, process_step_screenshot)
 
-    elif message.text == "👤 Личный кабинет":
-        username = f"@{message.from_user.username}" if message.from_user.username else "Нет юзернейма"
+    elif message.text == "👤 Мой профиль":
+        username = f"@{message.from_user.username}" if message.from_user.username else "Не установлен"
         text = (
-            f"👤 <b>Ваш Личный Кабинет</b>\n\n"
-            f"Имя: {html.escape(message.from_user.full_name)}\n"
-            f"Юзернейм: {html.escape(username)}\n"
-            f"ID в Telegram: <code>{message.chat.id}</code>\n\n"
-            f"Для подачи заявки на выплату используйте кнопку меню."
+            f"📋 <b>Информация об аккаунте</b>\n\n"
+            f"• Пользователь: {html.escape(message.from_user.full_name)}\n"
+            f"• Telegram-логин: {html.escape(username)}\n"
+            f"• Ваш уникальный ID: <code>{message.chat.id}</code>\n\n"
+            f"Все активные операции и запросы осуществляются через вкладки меню."
         )
         bot.send_message(message.chat.id, text, parse_mode="HTML", reply_markup=get_main_keyboard())
 
-    elif message.text == "🆘 Поддержка":
+    elif message.text == "🆘 Связь с админом":
         msg = bot.send_message(
             message.chat.id, 
-            "Напишите ниже свой вопрос или опишите проблему. Администрация рассмотрит обращение в ближайшее время:",
-            reply_markup=types.ReplyKeyboardRemove()
+            "<b>Техническая поддержка</b>\n\n"
+            "Опишите вашу проблему или задайте интересующий вопрос в одном текстовом сообщении. "
+            "Специалисты рассмотрят его в порядке очереди.",
+            reply_markup=get_cancel_keyboard()
         )
         bot.register_next_step_handler(msg, process_support_question)
 
-# --- ШАГИ ОФОРМЛЕНИЯ ЗАЯВКИ НА ВЫПЛАТУ ---
+# --- ЭТАПЫ КВЕСТА НА ВЫПЛАТУ ---
 def process_step_screenshot(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Назад в меню" or message.text in ["💰 Оформить выплату", "👤 Мой профиль", "🆘 Связь с админом"]:
         handle_menu(message)
         return
 
     if not message.photo:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, отправьте именно скриншот (картинку):")
+        msg = bot.send_message(message.chat.id, "⚠️ Система ожидает изображение. Пожалуйста, отправьте скриншот:")
         bot.register_next_step_handler(msg, process_step_screenshot)
         return
 
@@ -105,18 +121,19 @@ def process_step_screenshot(message):
 
     msg = bot.send_message(
         message.chat.id, 
-        "<b>Шаг 2 из 3</b>\n\nНапишите номер вашего банковского счёта на сервере:",
+        "<b>Этап 2 из 3: Платёжные реквизиты</b>\n\n"
+        "Укажите номер вашего банковского счёта внутри игры, куда должны поступить средства:",
         parse_mode="HTML"
     )
     bot.register_next_step_handler(msg, process_step_bank)
 
 def process_step_bank(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Назад в меню" or message.text in ["💰 Оформить выплату", "👤 Мой профиль", "🆘 Связь с админом"]:
         handle_menu(message)
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, введите номер банковского счёта текстом:")
+        msg = bot.send_message(message.chat.id, "⚠️ Текст не распознан. Наберите номер банковского счёта вручную:")
         bot.register_next_step_handler(msg, process_step_bank)
         return
 
@@ -124,25 +141,26 @@ def process_step_bank(message):
 
     msg = bot.send_message(
         message.chat.id, 
-        "<b>Шаг 3 из 3</b>\n\nНапишите название или номер сервера Majestic RP, на котором вы играете (например: Detroit):",
+        "<b>Этап 3 из 3: Игровой мир</b>\n\n"
+        "Напишите название игрового сервера Majestic RP (например: San Francisco, Detroit, New York):",
         parse_mode="HTML"
     )
     bot.register_next_step_handler(msg, process_step_server)
 
 def process_step_server(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Назад в меню" or message.text in ["💰 Оформить выплату", "👤 Мой профиль", "🆘 Связь с админом"]:
         handle_menu(message)
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, укажите ваш сервер текстом:")
+        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, введите название сервера текстом:")
         bot.register_next_step_handler(msg, process_step_server)
         return
 
     user_requests[message.chat.id]['server'] = message.text
 
     req_data = user_requests[message.chat.id]
-    username = f"@{message.from_user.username}" if message.from_user.username else "Нет юзернейма"
+    username = f"@{message.from_user.username}" if message.from_user.username else "Отсутствует"
 
     safe_name = html.escape(message.from_user.full_name)
     safe_username = html.escape(username)
@@ -150,10 +168,10 @@ def process_step_server(message):
     safe_bank = html.escape(req_data['bank'])
 
     admin_text = (
-        f"🚨 <b>Новая заявка на выплату!</b>\n\n"
-        f"👤 <b>Игрок:</b> {safe_name} ({safe_username})\n"
-        f"🌐 <b>Сервер:</b> {safe_server}\n"
-        f"💳 <b>Банковский счёт:</b> <code>{safe_bank}</code>\n\n"
+        f"📊 <b>Зарегистрирована новая анкета на выплату!</b>\n\n"
+        f"• <b>Пользователь:</b> {safe_name} ({safe_username})\n"
+        f"• <b>Игровой сервер:</b> {safe_server}\n"
+        f"• <b>Реквизиты банка:</b> <code>{safe_bank}</code>\n\n"
         f"User_ID: <code>{message.chat.id}</code>"
     )
 
@@ -161,43 +179,43 @@ def process_step_server(message):
         bot.send_photo(chat_id=ADMIN_CHAT_ID, photo=req_data['photo_id'], caption=admin_text, parse_mode="HTML")
         bot.send_message(
             message.chat.id, 
-            "✅ Спасибо! Ваша заявка, скриншот и данные успешно отправлены администрации на проверку. Ожидайте выплату.", 
+            "✨ Направление успешно сформировано! Ваша заявка и скриншот переданы на модерацию администраторам. Ожидайте зачисления транзакции.", 
             reply_markup=get_main_keyboard()
         )
     except Exception as e:
-        bot.send_message(message.chat.id, f"❌ Произошла ошибка при отправке заявки. Обратитесь в поддержку. ({e})", reply_markup=get_main_keyboard())
+        bot.send_message(message.chat.id, f"❌ Сбой отправки пакета данных. Обратитесь к кураторам. ({e})", reply_markup=get_main_keyboard())
     
     if message.chat.id in user_requests:
         del user_requests[message.chat.id]
 
 # --- ПОДДЕРЖКА ---
 def process_support_question(message):
-    if message.text in ["💰 Получить выплату за промокод", "👤 Личный кабинет", "🆘 Поддержка"]:
+    if message.text == "🔙 Назад в меню" or message.text in ["💰 Оформить выплату", "👤 Мой профиль", "🆘 Связь с админом"]:
         handle_menu(message)
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "Пожалуйста, отправьте текстовое сообщение с вашим вопросом:")
+        msg = bot.send_message(message.chat.id, "Пожалуйста, сформулируйте ваше текстовое обращение:")
         bot.register_next_step_handler(msg, process_support_question)
         return
 
-    username = f"@{message.from_user.username}" if message.from_user.username else "Нет юзернейма"
+    username = f"@{message.from_user.username}" if message.from_user.username else "Отсутствует"
     
     safe_name = html.escape(message.from_user.full_name)
     safe_username = html.escape(username)
     safe_question = html.escape(message.text)
 
     admin_text = (
-        f"❓ <b>Новый вопрос в поддержку!</b>\n\n"
-        f"👤 <b>Отправитель:</b> {safe_name} ({safe_username})\n"
-        f"📝 <b>Вопрос:</b> {safe_question}\n\n"
+        f"📬 <b>Поступило новое обращение!</b>\n\n"
+        f"• <b>Отправитель:</b> {safe_name} ({safe_username})\n"
+        f"• <b>Суть вопроса:</b> {safe_question}\n\n"
         f"User_ID: <code>{message.chat.id}</code>"
     )
 
     bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_text, parse_mode="HTML")
     bot.send_message(
         message.chat.id, 
-        "Ваш вопрос отправлен администрации. Ответ придет прямо сюда, в диалог с ботом.", 
+        "Ваш тикет зарегистрирован. Когда руководство подготовит ответ, он отобразится прямо в этом диалоге.", 
         reply_markup=get_main_keyboard()
     )
 
