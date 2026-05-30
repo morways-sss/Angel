@@ -30,18 +30,6 @@ def get_cancel_keyboard():
     markup.add(btn_cancel)
     return markup
 
-def get_servers_keyboard():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    btn1 = types.KeyboardButton("Сервер №1 | Рублёвка")
-    btn2 = types.KeyboardButton("Сервер №2 | Арбат")
-    btn3 = types.KeyboardButton("Сервер №3 | Патрики")
-    btn4 = types.KeyboardButton("Сервер №4 | Тверской")
-    btn_cancel = types.KeyboardButton("🔙 Назад в меню")
-    markup.add(btn1, btn2)
-    markup.add(btn3, btn4)
-    markup.add(btn_cancel)
-    return markup
-
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     welcome_text = (
@@ -112,6 +100,7 @@ def handle_menu(message):
             message.chat.id, 
             "<b>Напиши свой вопрос:</b>\n\n"
             "Напиши всё одним сообщением, и админ тебе обязательно ответит.",
+            parse_mode="HTML",
             reply_markup=get_cancel_keyboard()
         )
         bot.register_next_step_handler(msg, process_support_question)
@@ -131,7 +120,6 @@ def process_step_screenshot(message):
 
     msg = bot.send_message(
         message.chat.id, 
-        "<b>Шаг 2 из 3: Номер счёта или статик</b>\n\n"
         "Напиши номер банковского счёта или Статик:",
         parse_mode="HTML",
         reply_markup=get_cancel_keyboard()
@@ -153,9 +141,9 @@ def process_step_bank(message):
     msg = bot.send_message(
         message.chat.id, 
         "<b>Шаг 3 из 3: Сервер</b>\n\n"
-        "На каком сервере RMRP ты ввёл промокод?",
+        "Напиши вручную, на каком сервере RMRP ты ввёл промокод (например: Арбат):",
         parse_mode="HTML",
-        reply_markup=get_servers_keyboard()
+        reply_markup=get_cancel_keyboard()
     )
     bot.register_next_step_handler(msg, process_step_server)
 
@@ -165,7 +153,7 @@ def process_step_server(message):
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "⚠️ Пожалуйста, выбери сервер кнопкой снизу:")
+        msg = bot.send_message(message.chat.id, "⚠️ Напиши название сервера текстом:")
         bot.register_next_step_handler(msg, process_step_server)
         return
 
@@ -207,7 +195,7 @@ def process_support_question(message):
         return
 
     if not message.text:
-        msg = bot.send_message(message.chat.id, "Напиши свой вопрос текстом:")
+        msg = bot.send_message(message.chat.id, "Напиши свой вопрос текстом:", parse_mode="HTML")
         bot.register_next_step_handler(msg, process_support_question)
         return
 
